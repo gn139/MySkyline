@@ -1,24 +1,26 @@
 using System.Collections.Generic;
+using System.Threading;
 
 using UnityEngine;
 
 namespace Algorithm {
 	public class MarchingCubes : Marching {
 
-		private Vector3[] EdgeVertex { get; set; }
+		// private Vector3[] EdgeVertex { get; set; }
 
 		public MarchingCubes (float surface = 0.5f) : base (surface) {
-			EdgeVertex = new Vector3[12];
+			// EdgeVertex = new Vector3[12];
 		}
 
 		/// <summary>
 		/// MarchCube performs the Marching Cubes algorithm on a single cube
 		/// </summary>
-		protected override void March (float x, float y, float z, float[] cube, IList<Vector3> vertList, IList<int> indexList) {
+		protected override void March (float x, float y, float z,
+			float[] cube, IList<Vector3> vertList, IList<int> indexList, IList<Vector3> normals, int[] windingOrder) {
 			int i, j, vert, idx;
 			int flagIndex = 0;
 			float offset = 0.0f;
-
+			Vector3[] edgeVertex = new Vector3[12];
 			//Find which vertices are inside of the surface and which are outside
 			for (i = 0; i < 8; i++)
 				if (cube[i] <= Surface) flagIndex |= 1 << i;
@@ -35,22 +37,31 @@ namespace Algorithm {
 				if ((edgeFlags & (1 << i)) != 0) {
 					offset = GetOffset (cube[EdgeConnection[i, 0]], cube[EdgeConnection[i, 1]]);
 
-					EdgeVertex[i].x = x + (VertexOffset[EdgeConnection[i, 0], 0] + offset * EdgeDirection[i, 0]);
-					EdgeVertex[i].y = y + (VertexOffset[EdgeConnection[i, 0], 1] + offset * EdgeDirection[i, 1]);
-					EdgeVertex[i].z = z + (VertexOffset[EdgeConnection[i, 0], 2] + offset * EdgeDirection[i, 2]);
+					edgeVertex[i].x = x + (VertexOffset[EdgeConnection[i, 0], 0] + offset * EdgeDirection[i, 0]) * Lod;
+					edgeVertex[i].y = y + (VertexOffset[EdgeConnection[i, 0], 1] + offset * EdgeDirection[i, 1]) * Lod;
+					edgeVertex[i].z = z + (VertexOffset[EdgeConnection[i, 0], 2] + offset * EdgeDirection[i, 2]) * Lod;
 				}
 			}
+			// indexList.Clear ();
+			// vertList.Clear ();
 
+			Vector3[] triangle = new Vector3[3];
 			//Save the triangles that were found.
-			for (i = 0; TriangleConnectionTable[flagIndex, 3 * i] != -1; i++) {
+			for (i = 0; TriangleConnectionTable[flagIndex, i] != -1; i += 3) {
 
 				idx = vertList.Count;
-
 				for (j = 0; j < 3; j++) {
-					vert = TriangleConnectionTable[flagIndex, 3 * i + j];
-					indexList.Add (idx + WindingOrder[j]);
-					vertList.Add (EdgeVertex[vert]);
+					vert = TriangleConnectionTable[flagIndex, i + j];
+
+					indexList.Add (idx + windingOrder[j]);
+					vertList.Add (edgeVertex[vert]);
+					triangle[j] = edgeVertex[vert];
 				}
+				Vector3 normal = Vector3.Cross (triangle[windingOrder[1]] - triangle[windingOrder[0]],
+					triangle[windingOrder[2]] - triangle[windingOrder[0]]).normalized;
+				normals.Add (normal);
+				normals.Add (normal);
+				normals.Add (normal);
 			}
 		}
 

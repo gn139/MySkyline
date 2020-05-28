@@ -41,7 +41,7 @@ namespace Tests {
             }
             TestContext.WriteLine ($"densities {densities.Length}");
 
-            marching.Generate (densities, 32, 32, 32, verts, indices);
+            // marching.Generate (densities, 32, 32, 32, verts, indices);
             TestContext.WriteLine ($"verts {verts.Count}");
             TestContext.WriteLine ($"indices {indices.Count}");
         }

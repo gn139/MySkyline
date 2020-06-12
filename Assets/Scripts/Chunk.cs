@@ -9,19 +9,18 @@ using Algorithm;
 using UnityEngine;
 
 public class Chunk : MonoBehaviour, IDisposable {
-    public const int ChunkSize = 32;
-    public const int BitShift = 5;
+    public const int ChunkSize = 64;
+    public const int BitShift = 6;
     public Material Material { get; set; }
-    public int IsGenerated { get => isGenerated; set => isGenerated = value; }
-    public int IsMeshed { get => isMeshed; set => isMeshed = value; }
+    public bool IfDespawn { get; set; } = false;
+    public bool IfActive { get; set; } = false;
+    public int IsMeshed { get => isMeshed; set => Interlocked.Exchange (ref isMeshed, value); }
     // public int Lod { get; set; }
     public int IsDisposed { get => isDisposed; set => isDisposed = value; }
     public Vector3 Position { get; set; }
 
-    private int isGenerated = 0;
     private int isMeshed = 0; // 0 未进入meshqueue 1 已进入meshqueue 2 已生成mesh
     private int isDisposed = 0;
-    private bool isInactive = false;
     private Mesh mesh;
     private float[] densities;
     public FractalNoise Fractal { get; set; }
@@ -40,11 +39,22 @@ public class Chunk : MonoBehaviour, IDisposable {
         filter = this.gameObject.GetComponent<MeshFilter> ();
         render = this.gameObject.GetComponent<MeshRenderer> ();
         meshCollider = this.gameObject.GetComponent<MeshCollider> ();
+#if UNITY_EDITOR
+        // Debug.Log (gameObject.name + " On LastPostion");
+        // gameObject.name =
+        //     $"Chunk {transform.position.x},{transform.position.y},{transform.position.z} IsMeshed {IsMeshed} IsDisposed {IsDisposed}";
+#endif
+    }
+
+    private void Start () {
+#if UNITY_EDITOR
+        // Debug.Log (gameObject.name + " On LastPostion");
+        // gameObject.name =
+        //     $"Chunk {transform.position.x},{transform.position.y},{transform.position.z} IsMeshed {IsMeshed} IsDisposed {IsDisposed}";
+#endif
     }
 
     private void OnEnable () {
-        if (isInactive)
-            return;
 
         // if (mesh == null)
         mesh = new Mesh ();
@@ -152,7 +162,7 @@ public class Chunk : MonoBehaviour, IDisposable {
 #if UNITY_EDITOR
         // Debug.Log (gameObject.name + " On LastPostion");
         // gameObject.name =
-        //     $"Chunk {transform.position.x},{transform.position.y},{transform.position.z} IsMeshed {IsMeshed} IsGenerated {IsGenerated}";
+        //     $"Chunk {transform.position.x},{transform.position.y},{transform.position.z} IsMeshed {IsMeshed} IsDisposed {IsDisposed}";
 #endif
 
     }
@@ -160,6 +170,7 @@ public class Chunk : MonoBehaviour, IDisposable {
     private void OnWillRenderObject () {
 
     }
+
     void UpdateMesh () {
         // if (IsDisposed)
         //     return;
@@ -177,11 +188,9 @@ public class Chunk : MonoBehaviour, IDisposable {
         //     return;
         if (mesh == null)
             return;
-        lock (meshData) {
-            mesh.SetVertices (meshData.vertices);
-            mesh.SetNormals (meshData.normals);
-            mesh.SetIndices (meshData.indices.ToArray (), MeshTopology.Triangles, 0);
-        }
+        mesh.SetVertices (meshData.vertices);
+        mesh.SetNormals (meshData.normals);
+        mesh.SetIndices (meshData.indices.ToArray (), MeshTopology.Triangles, 0);
 
         // mesh.SetTriangles (indices, 0);
         // mesh.RecalculateBounds ();
@@ -193,7 +202,6 @@ public class Chunk : MonoBehaviour, IDisposable {
     }
 
     private void OnDisable () {
-        isInactive = true;
         // if (cts != null)
         //     cts.Cancel ();
         // Dispose ();
@@ -223,7 +231,6 @@ public class Chunk : MonoBehaviour, IDisposable {
 #endif
     public void Dispose () {
         isDisposed = 1;
-        isInactive = false;
         mesh = null;
         if (filter == null)
             return;

@@ -18,6 +18,6 @@ public class DevUI : MonoBehaviour {
     void Update () {
         textX.text = $"meshQueue {chunkManager.meshQueue.Count}";
         textY.text = $"activeQueue {chunkManager.activeQueue.Count}";
-        textZ.text = $"textZ {Input.gyro.userAcceleration.z}";
+        textZ.text = $"despawnQueue {chunkManager.despawnQueue.Count}";
     }
 }

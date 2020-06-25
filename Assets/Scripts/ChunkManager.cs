@@ -18,10 +18,10 @@ public class ChunkManager : MonoBehaviour {
     public float surface = 0.01f;
     public Material chunkMaterial;
 
-    private Dictionary<Vector3, Chunk> chunks;
+    public Dictionary<Vector3, Chunk> chunks;
     private Queue<Action> tasks;
     public Queue<Chunk> activeQueue;
-    private Queue<Chunk> despawnQueue;
+    public Queue<Chunk> despawnQueue;
     public ConcurrentQueue<Chunk> meshQueue;
     private FractalNoise fractal;
     private MarchingCubes marching;
@@ -53,7 +53,7 @@ public class ChunkManager : MonoBehaviour {
         despawnQueue = new Queue<Chunk> ();
         cts = new CancellationTokenSource ();
         factory = new TaskFactory (cts.Token);
-        semaphore = new SemaphoreSlim (4, 4);
+        semaphore = new SemaphoreSlim (6, 6);
 
         // ChunksManager ();
         ChunksMeshQueue ();
@@ -62,123 +62,64 @@ public class ChunkManager : MonoBehaviour {
     // async void ChunksManager () {
     //     await factory.StartNew (() => {
     //         while (!stop) {
-    //             Vector3 localPos = position;
-    //             for (int x = 0; x < spawnRadius; x++)
-    //                 for (int y = 0; y < spawnRadius; y++)
-    //                     for (int z = 0; z < spawnRadius; z++) {
-    //                         //Octant I
-    //                         Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosI) && chunks.TryGetValue (chunkPosI, out var chunk))
-    //                             ManageChunk (chunk, localPos);
-
-    //                         // ManageChunk (chunks[chunkPosI]);
-
-    //                         //Octant II
-    //                         Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosII) && chunks.TryGetValue (chunkPosII, out var chunk1))
-    //                             // ManageChunk (chunks[chunkPosII]);
-    //                             ManageChunk (chunk1, localPos);
-
-    //                         //Octant III
-    //                         Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosIII) && chunks.TryGetValue (chunkPosIII, out var chunk2))
-    //                             // ManageChunk (chunks[chunkPosIII]);
-
-    //                             ManageChunk (chunk2, localPos);
-
-    //                         //Octant IV
-    //                         Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosIV) && chunks.TryGetValue (chunkPosIV, out var chunk3))
-    //                             // ManageChunk (chunks[chunkPosIV]);
-    //                             ManageChunk (chunk3, localPos);
-
-    //                         //Octant V
-    //                         Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosV) && chunks.TryGetValue (chunkPosV, out var chunk4))
-    //                             // ManageChunk (chunks[chunkPosV]);
-    //                             ManageChunk (chunk4, localPos);
-
-    //                         //Octant VI
-    //                         Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosVI) && chunks.TryGetValue (chunkPosVI, out var chunk5))
-    //                             // ManageChunk (chunks[chunkPosVI]);
-    //                             ManageChunk (chunk5, localPos);
-
-    //                         //Octant VII
-    //                         Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosVII) && chunks.TryGetValue (chunkPosVII, out var chunk6))
-    //                             // ManageChunk (chunks[chunkPosVII]);
-    //                             ManageChunk (chunk6, localPos);
-
-    //                         //Octant VIII
-    //                         Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
-    //                             new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                         if (chunks.ContainsKey (chunkPosVIII) && chunks.TryGetValue (chunkPosVIII, out var chunk7))
-    //                             // ManageChunk (chunks[chunkPosVIII]);
-    //                             ManageChunk (chunk7, localPos);
-
-    //                     }
+    //             if (chunks.Count < 1)
+    //                 continue;
+    //             var chunksList = chunks.ToList ();
+    //             foreach (var pair in chunksList)
+    //                 ManageChunk (pair.Value);
     //         }
     //     }, TaskCreationOptions.LongRunning);
     // }
 
-    private bool ManageChunk (Chunk chunk) {
+    private void ManageChunk (Chunk chunk) {
         if (chunk == null)
-            return false;
-        if (chunk.IsDisposed == 1)
-            return false;
+            return;
         Vector3 dist = chunk.Position - position;
-
-        if (dist.sqrMagnitude > sqrInactiveDist && !chunk.IfDespawn) {
-            // lock (chunk)
-            chunk.IfDespawn = true;
-            despawnQueue.Enqueue (chunk);
-
-            // isModified = true;
-            return false;
-            // yield return null;
-        }
-
-        if (dist.sqrMagnitude <= sqrInactiveDist) {
-            // lock (chunk)
-            chunk.IfDespawn = false;
-        }
-
-        // if (chunk.IsGenerated == 0) {
-        //     lock (densitiesQueue)
-        //     densitiesQueue.Enqueue (chunk);
-        // }
-        if (chunk.IsMeshed == 0) {
-            chunk.IsMeshed = 1;
+        switch (chunk.State) {
+        case ChunkState.Created:
             meshQueue.Enqueue (chunk);
-            // Debug.Log("mesh Enqueue in Manage");
+            chunk.State = ChunkState.Processing;
+            break;
+        case ChunkState.Processing:
+            return;
+        case ChunkState.Processed:
+            if (dist.sqrMagnitude <= sqrInactiveDist) {
+                // Debug.Log ("activeQueue Enqueue");
+                chunk.State = ChunkState.InActive;
+                activeQueue.Enqueue (chunk);
+            }
+            break;
+        case ChunkState.InActive:
+            if (dist.sqrMagnitude > sqrInactiveDist) {
+                chunk.State = ChunkState.Disposing;
+                despawnQueue.Enqueue (chunk);
+            }
+            break;
+        case ChunkState.Active:
+            if (dist.sqrMagnitude > sqrInactiveDist) {
+                chunk.State = ChunkState.Disposing;
+                despawnQueue.Enqueue (chunk);
+            }
+            break;
+        case ChunkState.Disposing:
+            if (dist.sqrMagnitude <= sqrInactiveDist)
+                chunk.State = ChunkState.Active;
+            break;
+        case ChunkState.Disposed:
+            return;
         }
-
-        if (chunk.IsMeshed == 2 && !chunk.IfActive) {
-            // lock (chunk)
-            chunk.IfActive = true;
-            chunk.gameObject.SetActive (true);
-            // activeQueue.Enqueue (chunk);
-            // Debug.Log ($"Enqueue Success {Thread.CurrentThread.ManagedThreadId}");
-        }
-        return false;
     }
 
     async void ChunksMeshQueue () {
         await factory.StartNew (async () => {
             while (!stop) {
                 // Debug.Log ("mesh " + meshQueue.Count);
-                if (meshQueue.Count < 1)
+
+                // meshQueue.OrderBy (sortChunk => (position - sortChunk.Position).sqrMagnitude);
+#if UNITY_ANDROID
+                if (meshQueue.Count < 1 && tasks.Count < 1)
                     continue;
-                meshQueue.OrderBy (sortChunk => (position - sortChunk.Position).sqrMagnitude);
-                if (meshQueue.TryDequeue (out var chunk) && chunk != null && chunk.IsMeshed == 1)
+                if (meshQueue.TryDequeue (out var chunk) && chunk != null)
                     tasks.Enqueue (() => {
                         semaphore.Wait ();
                         chunk.BuildMesh ();
@@ -186,8 +127,13 @@ public class ChunkManager : MonoBehaviour {
                     });
 
                 if (semaphore.CurrentCount > 0 && tasks.Count > 0)
-                    await Task.Run(tasks.Dequeue(), cts.Token);
-                // chunk.BuildMesh ();
+                    await Task.Run (tasks.Dequeue (), cts.Token);
+#endif
+
+                // #if UNITY_EDITOR
+                //                 if (meshQueue.TryDequeue (out var chunk) && chunk != null)
+                //                     chunk.BuildMesh ();
+                // #endif
             }
         }, TaskCreationOptions.LongRunning);
 
@@ -200,8 +146,9 @@ public class ChunkManager : MonoBehaviour {
     private void OnEnable () {
         sqrActiveDist = (spawnRadius >> 1) * Chunk.ChunkSize * (spawnRadius >> 1) * Chunk.ChunkSize;
         sqrInactiveDist = spawnRadius * Chunk.ChunkSize * spawnRadius * Chunk.ChunkSize;
-        // StartCoroutine (InstantiateChunks ());
-        // StartCoroutine (ActivePlayerChunks ());
+        StartCoroutine (InstantiateChunks ());
+        StartCoroutine (ManageAllChunks ());
+        StartCoroutine (ActivePlayerChunks ());
         StartCoroutine (DespawnChunks ());
     }
 
@@ -212,11 +159,12 @@ public class ChunkManager : MonoBehaviour {
 
             // while (despawnQueue.Count > 0)
             var chunk = despawnQueue.Dequeue ();
-            if (chunk != null && chunk.IfDespawn) {
+            if (chunk != null && chunk.State == ChunkState.Disposing) {
                 chunk.Dispose ();
-                SimplePool.Despawn (chunk.gameObject);
                 chunks.Remove (chunk.transform.position);
-                Debug.Log ("Despawn");
+                SimplePool.Despawn (chunk.gameObject);
+                // Destroy (chunk.gameObject);
+                // Debug.Log ("Despawn");
             }
 
             despawnSkip:
@@ -224,152 +172,121 @@ public class ChunkManager : MonoBehaviour {
         }
     }
 
-    // IEnumerator ActivePlayerChunks () {
-    //     while (this.gameObject.activeSelf) {
-    //         // if (activeQueue.Count < 1)
-    //         //     goto activeSkip;
+    IEnumerator ActivePlayerChunks () {
+        while (this.gameObject.activeSelf) {
+            if (activeQueue.Count < 1)
+                goto activeSkip;
 
-    //         // // while (activeQueue.Count > 0)
+            // while (activeQueue.Count > 0)
+            var chunk = activeQueue.Dequeue ();
+            // Debug.Log ("activeQueue dequeue");
+            if (chunk != null && chunk.State == ChunkState.InActive) {
+                chunk.State = ChunkState.Active;
+                chunk.gameObject.SetActive (true);
+            }
 
-    //         // activeQueue.OrderBy (sortChunk => (position - sortChunk.Position).sqrMagnitude);
-    //         // if (activeQueue.TryDequeue (out var chunk) && chunk != null && chunk.IfActive) {
-    //         //     Debug.Log ("Dequeue Success");
-    //         //     lock (chunk)
-    //         //     chunk.gameObject.SetActive (true);
-    //         // }
+            activeSkip:
+                yield return null;
 
-    //         // activeSkip:
-    //         //     yield return null;
-    //         for (int x = 0; x < 2; x++) {
-    //             for (int y = 0; y < 2; y++) {
-    //                 for (int z = 0; z < 2; z++) {
-    //                     //Octant I
-    //                     Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosI))
-    //                         InstantiateChunk (chunkPosI);
+        }
+    }
 
-    //                     //Octant II
-    //                     Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosII))
-    //                         InstantiateChunk (chunkPosII);
+    IEnumerator ManageAllChunks () {
+        while (this.gameObject.activeSelf) {
+            foreach (var pair in chunks)
+                ManageChunk (pair.Value);
+            yield return null;
+        }
+    }
 
-    //                     //Octant III
-    //                     Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosIII))
-    //                         InstantiateChunk (chunkPosIII);
+    IEnumerator InstantiateChunks () {
+        while (this.gameObject.activeSelf) {
+            Vector3 localPos = position;
+            // Debug.Log($"position {position}");
+            // Debug.Log($"lastPosition {lastPosition}");
+            // Debug.Log ("mesh " + meshQueue.Count);
+            if (localPos == lastPosition)
+                goto skip;
 
-    //                     //Octant IV
-    //                     Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosIV))
-    //                         InstantiateChunk (chunkPosIV);
+            lastPosition = localPos;
 
-    //                     //Octant V
-    //                     Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosV))
-    //                         InstantiateChunk (chunkPosV);
+            //因为生成范围是以position为中心的球体，所以只循环第一卦限中的点并利用对称特性获得其他点
+            for (int x = 0; x < spawnRadius; x++) {
+                for (int y = 0; y < spawnRadius; y++) {
+                    for (int z = 0; z < spawnRadius; z++) {
+                        //Octant I
+                        Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosI))
+                        //     ManageChunk (chunks[chunkPosI]);
+                        if (!chunks.ContainsKey (chunkPosI) && (chunkPosI - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosI);
 
-    //                     //Octant VI
-    //                     Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosVI))
-    //                         InstantiateChunk (chunkPosVI);
+                        //Octant II
+                        Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosII))
+                        //     ManageChunk (chunks[chunkPosII]);
+                        if (!chunks.ContainsKey (chunkPosII) && (chunkPosII - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosII);
 
-    //                     //Octant VII
-    //                     Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosVII))
-    //                         InstantiateChunk (chunkPosVII);
+                        //Octant III
+                        Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosIII))
+                        //     ManageChunk (chunks[chunkPosIII]);
+                        if (!chunks.ContainsKey (chunkPosIII) && (chunkPosIII - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosIII);
 
-    //                     //Octant VIII
-    //                     Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-    //                     if (!chunks.ContainsKey (chunkPosVIII))
-    //                         InstantiateChunk (chunkPosVIII);
+                        //Octant IV
+                        Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosIV))
+                        //     ManageChunk (chunks[chunkPosIV]);
+                        if (!chunks.ContainsKey (chunkPosIV) && (chunkPosIV - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosIV);
 
-    //                 }
-    //             }
-    //         }
-    //         yield return null;
-    //     }
-    // }
+                        //Octant V
+                        Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosV))
+                        //     ManageChunk (chunks[chunkPosV]);
+                        if (!chunks.ContainsKey (chunkPosV) && (chunkPosV - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosV);
 
-    // IEnumerator InstantiateChunks () {
-    //     while (this.gameObject.activeSelf) {
-    //         Vector3 localPos = position;
-    //         // Debug.Log($"position {position}");
-    //         // Debug.Log($"lastPosition {lastPosition}");
-    //         // Debug.Log ("mesh " + meshQueue.Count);
-    //         if (localPos == lastPosition)
-    //             goto skip;
+                        //Octant VI
+                        Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosVI))
+                        //     ManageChunk (chunks[chunkPosVI]);
+                        if (!chunks.ContainsKey (chunkPosVI) && (chunkPosVI - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosVI);
 
-    //         lastPosition = localPos;
+                        //Octant VII
+                        Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosVII))
+                        //     ManageChunk (chunks[chunkPosVII]);
+                        if (!chunks.ContainsKey (chunkPosVII) && (chunkPosVII - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosVII);
 
-    //         //因为生成范围是以position为中心的球体，所以只循环第一卦限中的点并利用对称特性获得其他点
-    //         for (int x = 0; x < spawnRadius; x++) {
-    //             for (int y = 0; y < spawnRadius; y++) {
-    //                 for (int z = 0; z < spawnRadius; z++) {
-    //                     //Octant I
-    //                     Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosI))
-    //                         InstantiateChunk (chunkPosI);
+                        //Octant VIII
+                        Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
+                            new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
+                        // if (chunks.ContainsKey (chunkPosVIII))
+                        //     ManageChunk (chunks[chunkPosVIII]);
+                        if (!chunks.ContainsKey (chunkPosVIII) && (chunkPosVIII - localPos).sqrMagnitude < sqrInactiveDist)
+                            InstantiateChunk (chunkPosVIII);
 
-    //                     //Octant II
-    //                     Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosII))
-    //                         InstantiateChunk (chunkPosII);
+                    }
+                }
+            }
 
-    //                     //Octant III
-    //                     Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosIII))
-    //                         InstantiateChunk (chunkPosIII);
-
-    //                     //Octant IV
-    //                     Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosIV))
-    //                         InstantiateChunk (chunkPosIV);
-
-    //                     //Octant V
-    //                     Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosV))
-    //                         InstantiateChunk (chunkPosV);
-
-    //                     //Octant VI
-    //                     Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosVI))
-    //                         InstantiateChunk (chunkPosVI);
-
-    //                     //Octant VII
-    //                     Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosVII))
-    //                         InstantiateChunk (chunkPosVII);
-
-    //                     //Octant VIII
-    //                     Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
-    //                         new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + localPos;
-    //                     if (!chunks.ContainsKey (chunkPosVIII))
-    //                         InstantiateChunk (chunkPosVIII);
-
-    //                 }
-    //             }
-    //         }
-
-    //         skip:
-    //             yield return null;
-    //     }
-    //     // }
-    // }
+            skip:
+                yield return null;
+        }
+        // }
+    }
 
     void Update () {
 
@@ -384,75 +301,94 @@ public class ChunkManager : MonoBehaviour {
         // lastPosition = position;
         //因为生成范围是以position为中心的球体，所以只循环第一卦限中的点并利用对称特性获得其他点
 
-        for (int x = 0; x < spawnRadius; x++) {
-            for (int y = 0; y < spawnRadius; y++) {
-                for (int z = 0; z < spawnRadius; z++) {
-                    //Octant I
-                    Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosI))
-                        ManageChunk (chunks[chunkPosI]);
-                    else if ((chunkPosI - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosI);
+        // for (int x = 0; x < 2; x++) {
+        //     for (int y = 0; y < 2; y++) {
+        //         for (int z = 0; z < 2; z++) {
+        //             //Octant I
+        //             Vector3 chunkPosI = Vector3.Scale (new Vector3 (x, y, z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosI))
+        //                 HandleNearChunk (chunks[chunkPosI]);
+        //             else if ((chunkPosI - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosI);
 
-                    //Octant II
-                    Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosII))
-                        ManageChunk (chunks[chunkPosII]);
-                    else if ((chunkPosII - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosII);
+        //             //Octant II
+        //             Vector3 chunkPosII = Vector3.Scale (new Vector3 (-x, y, z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosII))
+        //                 HandleNearChunk (chunks[chunkPosI]);
+        //             else if ((chunkPosII - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosII);
 
-                    //Octant III
-                    Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosIII))
-                        ManageChunk (chunks[chunkPosIII]);
-                    else if ((chunkPosIII - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosIII);
+        //             //Octant III
+        //             Vector3 chunkPosIII = Vector3.Scale (new Vector3 (-x, -y, z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosIII))
+        //                 HandleNearChunk (chunks[chunkPosI]);
+        //             else if ((chunkPosIII - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosIII);
 
-                    //Octant IV
-                    Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosIV))
-                        ManageChunk (chunks[chunkPosIV]);
-                    else if ((chunkPosIV - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosIV);
+        //             //Octant IV
+        //             Vector3 chunkPosIV = Vector3.Scale (new Vector3 (x, -y, z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosIV))
+        //                 HandleNearChunk (chunks[chunkPosIV]);
+        //             else if ((chunkPosIV - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosIV);
 
-                    //Octant V
-                    Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosV))
-                        ManageChunk (chunks[chunkPosV]);
-                    else if ((chunkPosV - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosV);
+        //             //Octant V
+        //             Vector3 chunkPosV = Vector3.Scale (new Vector3 (x, y, -z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosV))
+        //                 HandleNearChunk (chunks[chunkPosV]);
+        //             else if ((chunkPosV - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosV);
 
-                    //Octant VI
-                    Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosVI))
-                        ManageChunk (chunks[chunkPosVI]);
-                    else if ((chunkPosVI - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosVI);
+        //             //Octant VI
+        //             Vector3 chunkPosVI = Vector3.Scale (new Vector3 (-x, y, -z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosVI))
+        //                 HandleNearChunk (chunks[chunkPosVI]);
+        //             else if ((chunkPosVI - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosVI);
 
-                    //Octant VII
-                    Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosVII))
-                        ManageChunk (chunks[chunkPosVII]);
-                    else if ((chunkPosVII - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosVII);
+        //             //Octant VII
+        //             Vector3 chunkPosVII = Vector3.Scale (new Vector3 (-x, -y, -z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosVII))
+        //                 HandleNearChunk (chunks[chunkPosVII]);
+        //             else if ((chunkPosVII - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosVII);
 
-                    //Octant VIII
-                    Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
-                        new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
-                    if (chunks.ContainsKey (chunkPosVIII))
-                        ManageChunk (chunks[chunkPosVIII]);
-                    else if ((chunkPosVIII - position).sqrMagnitude < sqrInactiveDist)
-                        InstantiateChunk (chunkPosVIII);
+        //             //Octant VIII
+        //             Vector3 chunkPosVIII = Vector3.Scale (new Vector3 (x, -y, -z),
+        //                 new Vector3 (Chunk.ChunkSize, Chunk.ChunkSize, Chunk.ChunkSize)) + position;
+        //             if (chunks.ContainsKey (chunkPosVIII))
+        //                 HandleNearChunk (chunks[chunkPosVIII]);
+        //             else if ((chunkPosVIII - position).sqrMagnitude < sqrInactiveDist)
+        //                 InstantiateChunk (chunkPosVIII);
 
-                }
-            }
+        //         }
+        //     }
+        // }
+
+    }
+
+    private void HandleNearChunk (Chunk chunk) {
+        switch (chunk.State) {
+        case ChunkState.Created:
+            meshQueue.Enqueue (chunk);
+            chunk.State = ChunkState.Processing;
+            break;
+        case ChunkState.Processing:
+            meshQueue.OrderBy (sortChunk => (position - sortChunk.Position).sqrMagnitude);
+            break;
+        case ChunkState.Processed:
+            chunk.State = ChunkState.InActive;
+            break;
+        case ChunkState.InActive:
+            activeQueue.OrderBy (sortChunk => (position - sortChunk.Position).sqrMagnitude);
+            break;
         }
 
     }
@@ -462,7 +398,10 @@ public class ChunkManager : MonoBehaviour {
             return;
 
         GameObject newChunk = SimplePool.Spawn (chunkPrefab, chunkPos, Quaternion.identity, false);
+        // GameObject newChunk = new GameObject ();
+        newChunk.transform.position = chunkPos;
         newChunk.transform.SetParent (world.gameObject.transform);
+        // newChunk.SetActive(false);
         Chunk chunk = newChunk.GetComponent<Chunk> ();
         if (chunk == null)
             chunk = newChunk.AddComponent<Chunk> ();
@@ -471,17 +410,14 @@ public class ChunkManager : MonoBehaviour {
         chunk.Fractal = fractal;
         chunk.Marching = marching;
         chunk.Material = chunkMaterial;
-        chunk.IfDespawn = false;
-        chunk.IfActive = false;
-        chunk.IsMeshed = 0;
-        chunk.IsDisposed = 0;
+        chunk.State = ChunkState.Created;
 
 #if UNITY_EDITOR
-        newChunk.name = $"Chunk {chunkPos.x}, {chunkPos.y}, {chunkPos.z} IsMeshed{chunk.IsMeshed}";
+        newChunk.name = $"Chunk {chunkPos.x}, {chunkPos.y}, {chunkPos.z} State {chunk.State}";
 #endif
         chunks.Add (chunkPos, chunk);
-        chunk.IsMeshed = 1;
-        meshQueue.Enqueue (chunk);
+        // chunk.IsMeshed = 1;
+        // meshQueue.Enqueue (chunk);
         // Debug.Log("mesh Enqueue in Instantiate");
     }
 

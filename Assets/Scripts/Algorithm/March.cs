@@ -60,8 +60,10 @@ namespace Algorithm {
                             ix = x + VertexOffset[i, 0] * Lod;
                             iy = y + VertexOffset[i, 1] * Lod;
                             iz = z + VertexOffset[i, 2] * Lod;
-                            cube[i] = fractal.Noise3D ((ix + position.x) / (Chunk.ChunkSize - 1),
+                            cube[i] = (float) OpenSimplexNoise.Evaluate ((ix + position.x) / (Chunk.ChunkSize - 1),
                                 (iy + position.y) / (Chunk.ChunkSize - 1), (iz + position.z) / (Chunk.ChunkSize - 1));
+                            // cube[i] = fractal.Noise3D ((ix + position.x) / (Chunk.ChunkSize - 1),
+                            //     (iy + position.y) / (Chunk.ChunkSize - 1), (iz + position.z) / (Chunk.ChunkSize - 1));
                             // cube[i] = voxels[ix + iy * width + iz * width * height];
 
                         }

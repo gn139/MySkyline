@@ -28,7 +28,6 @@ namespace Algorithm {
 
         public Marching (float surface = 0.5f) {
             Surface = surface;
-
         }
 
         public virtual MeshData Generate (IList<float> voxels, Vector3 position, FractalNoise fractal) {

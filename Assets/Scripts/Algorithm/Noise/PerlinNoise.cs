@@ -284,7 +284,9 @@ namespace Algorithm {
         /// <summary>
         /// https://gamedev.stackexchange.com/questions/166124/perlin-noise-generation-always-returning-zero
         /// https://forum.libcinder.org/topic/perlin-returns-zero-for-all-integer-arguments
-        /// For whatever input point P you're evaluating, and for each surrounding grid point Q, P - Q is the vector from the grid point Q to the input point P. So if P is on an integer coordinate, P-Q will have length zero! And therefore its dot product with the gradient vector will be zero. 
+        /// For whatever input point P you're evaluating, and for each surrounding grid point Q, 
+        /// P - Q is the vector from the grid point Q to the input point P. 
+        /// So if P is on an integer coordinate, P-Q will have length zero! And therefore its dot product with the gradient vector will be zero. 
         /// </summary>
         /// <param name="x">NO INT</param>
         /// <param name="y">NO INT</param>
